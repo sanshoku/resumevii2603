@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Resume - Vii Pan</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            margin: 0;
+            overflow-x: hidden;
+            background-color: #ffffff;
+            color: #1e293b;
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            -webkit-print-color-adjust: exact; /* 確保列印時保留背景與顏色 */
+            print-color-adjust: exact;
+        }
+        #canvas-container {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+        }
+        .glass-morphism {
+            background: rgba(255, 255, 255, 0.7);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(0, 0, 0, 0.08);
+            box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.05);
+        }
+        .skill-tag {
+            transition: all 0.3s ease;
+        }
+        .skill-tag:hover {
+            transform: translateY(-2px);
+            background: rgba(249, 115, 22, 0.1);
+        }
+        /* 自定義捲軸 */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f8fafc;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+
+        /* --- 列印專用樣式 --- */
+        @media print {
+            @page { 
+                margin: 0; /* 移除瀏覽器預設的頁首頁尾（網址、日期等） */
+            }
+            body { 
+                padding: 1.5cm; /* 設定 PDF 的邊距 */
+            }
+            #canvas-container { 
+                display: none !important; /* 隱藏動態星圖，節省效能與避免列印破圖 */
+            }
+            .print-hidden { 
+                display: none !important; /* 隱藏不想印出來的按鈕 */
+            }
+            .glass-morphism { 
+                break-inside: avoid; /* 非常重要：防止卡片在 PDF 換頁時被從中間切斷 */
+                page-break-inside: avoid;
+                border: 1px solid rgba(0, 0, 0, 0.1) !important;
+                box-shadow: none !important;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="canvas-container">
+        <canvas id="resumeCanvas"></canvas>
+    </div>
+
+    <!-- Main Content Area 加上 id 讓 PDF 工具定位 -->
+    <main id="resume-content" class="relative z-10 max-w-4xl mx-auto px-6 py-20">
+        
+        <!-- Header -->
+        <section class="text-center mb-16 animate-fade-in">
+            <h1 id="user-name" class="text-5xl md:text-7xl font-bold mb-4 bg-gradient-to-r from-orange-500 to-amber-500 bg-clip-text text-transparent">
+                Loading...
+            </h1>
+            <p id="user-title" class="text-xl md:text-2xl text-slate-500 mb-8 font-light tracking-widest uppercase">
+                Loading Title
+            </p>
+            <!-- 加上 print-hidden 讓按鈕不要印在 PDF 上 -->
+            <div class="flex justify-center space-x-4 print-hidden">
+                <button id="download-btn" class="px-6 py-2 rounded-full bg-orange-600 text-white hover:bg-orange-700 transition-all cursor-pointer shadow-md hover:shadow-lg">Print / Save as PDF</button>
+            </div>
+        </section>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+            
+            <!-- Left Column: About & Contact -->
+            <div class="md:col-span-1 space-y-8">
+                <div class="glass-morphism p-6 rounded-2xl">
+                    <h2 class="text-xl font-bold mb-4 border-b border-slate-200 pb-2 flex items-center text-slate-800">
+                        <span class="mr-2">👤</span> About Me
+                    </h2>
+                    <p id="user-about" class="text-slate-600 leading-relaxed text-sm">
+                        Loading content...
+                    </p>
+                </div>
+
+                <div class="glass-morphism p-6 rounded-2xl">
+                    <h2 class="text-xl font-bold mb-4 border-b border-slate-200 pb-2 flex items-center text-slate-800">
+                        <span class="mr-2">📧</span> Contact
+                    </h2>
+                    <ul id="user-contact" class="space-y-3 text-sm text-slate-600">
+                        <!-- Dynamically populated -->
+                    </ul>
+                </div>
+            </div>
+
+            <!-- Right Column: Experience & Education -->
+            <div class="md:col-span-2 space-y-8">
+                <div class="glass-morphism p-8 rounded-2xl">
+                    <h2 class="text-2xl font-bold mb-6 flex items-center text-orange-500">
+                        <span class="mr-3">💼</span> Experience
+                    </h2>
+                    <div id="experience-list" class="space-y-8 relative before:content-[''] before:absolute before:left-2 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-200">
+                        <!-- Dynamically populated -->
+                    </div>
+                </div>
+
+                <div class="glass-morphism p-8 rounded-2xl">
+                    <h2 class="text-2xl font-bold mb-6 flex items-center text-amber-500">
+                        <span class="mr-3">🎓</span> Education
+                    </h2>
+                    <div id="education-list" class="space-y-4">
+                        <!-- Dynamically populated -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        /**
+         * 📝 Resume Data
+         */
+        const resumeData = {
+            name: "Vii Pan",
+            title: "Product Owner / UX Designer",
+            about: "Leveraging cognitive psychology principles to drive intuitive user experiences. A trilingual (English, Japanese, Mandarin) UX-focused digital product strategist and designer. Adept at data-driven experience research, business and task analysis, and information architecture. Over 4 years of experience delivering product strategies, managing agile development scrums, and handling stakeholder requirements for B2B and B2C digital services.",
+            contact: {
+                email: "dearviipan@gmail.com",
+                location: "Tokyo, Japan",
+                linkedin: "linkedin.com/in/wenlinpan"
+            },
+            experience: [
+                {
+                    role: "Product Designer / Planner",
+                    company: "freee co.",
+                    period: "2023 - Present",
+                    desc: "• Spearheaded the end-to-end lifecycle of 7 products/features across 3 major domains, successfully integrating existing services and pioneering new AI-driven solutions.<br>• Launched a new AI product that generated over ¥10M in revenue within the first few months, and secured 2 patents for innovative feature designs.<br>• Accelerated cross-functional alignment by rapidly developing interactive prototypes, directly enabling the Sales team to acquire/retain contracts and improving Customer Success (CS) communication efficiency.<br>• Created comprehensive PRDs, user flows, and wireframes while refining existing design systems to maintain UI consistency.<br>• Partnered with Product Managers (PdMs) to streamline agile development workflows and actively mentored multiple team members, elevating overall operational efficiency."
+                },
+                {
+                    role: "Product Owner / UX Designer",
+                    company: "Trend Micro",
+                    period: "2020 - 2023",
+                    desc: "• Facilitated the agile development process of 9 products.<br>• Served 7,000+ users across 65 countries, catering to both end-users and operators.<br>• Streamlined 3 critical business flows to significantly accelerate task completion speed.<br>• Designed and established a reliable, intuitive search and query experience."
+                },
+                {
+                    role: "UX Designer / Consultant",
+                    company: "TVBS",
+                    period: "2020",
+                    desc: "• Provided UX consultation and design solutions to optimize digital user experiences and bridge stakeholder requirements."
+                }
+            ],
+            education: [
+                {
+                    degree: "M.S. Information Experience Design",
+                    school: "Pratt Institute, New York, USA",
+                    year: "2018 - 2020",
+                    desc: "GPA: 3.8. Focus: Usability Test, Information Arch/Interaction Design, Business Analysis."
+                },
+                {
+                    degree: "B.S. Psychology",
+                    school: "National Cheng-Chi University, Taipei, Taiwan",
+                    year: "2013 - 2017",
+                    desc: "GPA: 3.4. Focus: Psychological Statistics, Human-factor engineering, Cognitive Psychology."
+                }
+            ],
+            skills: [
+                { name: "UX Design", level: 90, color: "#f97316" },
+                { name: "Product Strategy", level: 85, color: "#fbbf24" },
+                { name: "Agile/Scrum", level: 80, color: "#94a3b8" }, /* 調整在白底的顏色 */
+                { name: "Info Architecture", level: 85, color: "#facc15" },
+                { name: "User Research", level: 88, color: "#fb923c" },
+                { name: "English (Pro)", level: 90, color: "#fcd34d" },
+                { name: "Japanese (N1)", level: 95, color: "#fdba74" },
+                { name: "Mandarin (Native)", level: 100, color: "#ea580c" }
+            ]
+        };
+
+        // --- Initialize UI ---
+        function initUI() {
+            document.getElementById('user-name').innerText = resumeData.name;
+            document.getElementById('user-title').innerText = resumeData.title;
+            document.getElementById('user-about').innerText = resumeData.about;
+
+            const contactEl = document.getElementById('user-contact');
+            contactEl.innerHTML = `
+                <li><strong>📍</strong> ${resumeData.contact.location}</li>
+                <li><strong>📧</strong> ${resumeData.contact.email}</li>
+                <li><strong>🔗</strong> ${resumeData.contact.linkedin}</li>
+            `;
+
+            const expEl = document.getElementById('experience-list');
+            expEl.innerHTML = resumeData.experience.map(exp => `
+                <div class="pl-8 relative">
+                    <div class="absolute left-0 top-1.5 w-4 h-4 rounded-full bg-orange-500 border-4 border-white"></div>
+                    <h3 class="text-xl font-bold text-slate-800">${exp.role}</h3>
+                    <p class="text-orange-500 font-medium text-sm mb-2">${exp.company} | ${exp.period}</p>
+                    <p class="text-slate-600 text-sm leading-relaxed">${exp.desc}</p>
+                </div>
+            `).join('');
+
+            const eduEl = document.getElementById('education-list');
+            eduEl.innerHTML = resumeData.education.map(edu => `
+                <div class="flex flex-col mb-4">
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <h3 class="font-bold text-slate-800">${edu.degree}</h3>
+                            <p class="text-slate-500 text-sm">${edu.school}</p>
+                        </div>
+                        <span class="text-xs text-slate-500 font-mono">${edu.year}</span>
+                    </div>
+                    <p class="text-xs text-slate-500 mt-1">${edu.desc}</p>
+                </div>
+            `).join('');
+        }
+
+        // --- Canvas 互動星圖邏輯 ---
+        const canvas = document.getElementById('resumeCanvas');
+        const ctx = canvas.getContext('2d');
+        let width, height;
+        let particles = [];
+        let mouse = { x: -1000, y: -1000 };
+
+        function resize() {
+            width = window.innerWidth;
+            height = window.innerHeight;
+            canvas.width = width;
+            canvas.height = height;
+        }
+
+        class Particle {
+            constructor(skill) {
+                this.skill = skill;
+                this.x = Math.random() * width;
+                this.y = Math.random() * height;
+                this.baseSize = 4 + (skill.level / 20);
+                this.size = this.baseSize;
+                this.vx = (Math.random() - 0.5) * 0.5;
+                this.vy = (Math.random() - 0.5) * 0.5;
+                this.color = skill.color;
+                this.opacity = 0.6 + (skill.level / 200); // 在白底稍微提高一點不透明度
+            }
+
+            draw() {
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fillStyle = this.color;
+                ctx.globalAlpha = this.opacity;
+                ctx.fill();
+                
+                // 繪製文字標籤
+                if (this.size > this.baseSize * 1.5) {
+                    ctx.font = "600 12px sans-serif";
+                    ctx.fillStyle = "#334155"; // 改為深色文字
+                    ctx.globalAlpha = 1;
+                    ctx.textAlign = "center";
+                    ctx.fillText(this.skill.name, this.x, this.y + this.size + 15);
+                }
+            }
+
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+
+                // 邊界回彈
+                if (this.x < 0 || this.x > width) this.vx *= -1;
+                if (this.y < 0 || this.y > height) this.vy *= -1;
+
+                // 滑鼠互動
+                const dx = mouse.x - this.x;
+                const dy = mouse.y - this.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+
+                if (dist < 150) {
+                    this.size = this.baseSize * (1 + (150 - dist) / 50);
+                    // 輕微排斥力
+                    this.x -= dx * 0.01;
+                    this.y -= dy * 0.01;
+                } else {
+                    this.size += (this.baseSize - this.size) * 0.1;
+                }
+            }
+        }
+
+        function initCanvas() {
+            resize();
+            particles = resumeData.skills.map(s => new Particle(s));
+            // 補齊一些裝飾用的小粒子，改成淺灰色適配白底
+            for (let i = 0; i < 40; i++) {
+                particles.push(new Particle({ name: "", level: 10, color: "#cbd5e1" }));
+            }
+        }
+
+        function animate() {
+            ctx.clearRect(0, 0, width, height);
+            
+            // 繪製連線，改為適合白底的深灰色微透明
+            ctx.strokeStyle = "rgba(100, 116, 139, 0.15)";
+            ctx.beginPath();
+            for (let i = 0; i < particles.length; i++) {
+                for (let j = i + 1; j < particles.length; j++) {
+                    const dx = particles[i].x - particles[j].x;
+                    const dy = particles[i].y - particles[j].y;
+                    const dist = Math.sqrt(dx * dx + dy * dy);
+                    if (dist < 200) {
+                        ctx.moveTo(particles[i].x, particles[i].y);
+                        ctx.lineTo(particles[j].x, particles[j].y);
+                    }
+                }
+            }
+            ctx.stroke();
+
+            particles.forEach(p => {
+                p.update();
+                p.draw();
+            });
+
+            requestAnimationFrame(animate);
+        }
+
+        // 事件監聽
+        window.addEventListener('resize', resize);
+        window.addEventListener('mousemove', (e) => {
+            mouse.x = e.clientX;
+            mouse.y = e.clientY;
+        });
+
+        // 啟動
+        window.onload = () => {
+            initUI();
+            initCanvas();
+            animate();
+        };
+
+        // --- PDF 下載邏輯 (改為瀏覽器原生列印) ---
+        document.getElementById('download-btn').addEventListener('click', function() {
+            // 直接呼叫瀏覽器的列印功能
+            window.print();
+        });
+    </script>
+</body>
+</html>
