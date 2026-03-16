@@ -91,10 +91,6 @@
             <p id="user-title" class="text-xl md:text-2xl text-slate-500 mb-8 font-light tracking-widest uppercase">
                 Loading Title
             </p>
-            <!-- 加上 print-hidden 讓按鈕不要印在 PDF 上 -->
-            <div class="flex justify-center space-x-4 print-hidden">
-                <button id="download-btn" class="px-6 py-2 rounded-full bg-orange-600 text-white hover:bg-orange-700 transition-all cursor-pointer shadow-md hover:shadow-lg">Print / Save as PDF</button>
-            </div>
         </section>
 
         <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -357,12 +353,6 @@
             initCanvas();
             animate();
         };
-
-        // --- PDF 下載邏輯 (改為瀏覽器原生列印) ---
-        document.getElementById('download-btn').addEventListener('click', function() {
-            // 直接呼叫瀏覽器的列印功能
-            window.print();
-        });
     </script>
 </body>
 </html>
